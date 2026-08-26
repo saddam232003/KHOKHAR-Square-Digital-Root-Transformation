@@ -7,7 +7,7 @@ The KHOKHAR Square Digital Root Transformation: 7443 A Fixed-Point Analysis of a
 
 An interactive graphical tool to explore the **KHOKHAR Square Digital Root Transformation** – a beautiful iterative process on 4‑digit numbers that eventually reaches a fixed point.
 
-![GUI Demo](https://via.placeholder.com/800x500?text=Screenshot+Placeholder)  
+ 
 *(Replace with an actual screenshot)*
 
 ---
@@ -52,5 +52,5 @@ Repeated application of **T** eventually reaches a **fixed point** (e.g., `7443`
 
 ### Clone the repository
 ```bash
-git clone https://github.com/yourusername/KHOKHAR-Square-DRT-GUI.git
+git clone (https://github.com/saddam232003/KHOKHAR-Square-Digital-Root-Transformation/blob/main/README.md)
 cd KHOKHAR-Square-DRT-GUI
