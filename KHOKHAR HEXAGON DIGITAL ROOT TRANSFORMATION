@@ -1,0 +1,389 @@
+"""
+KHOKHAR HEXAGON DIGITAL ROOT TRANSFORMATION – Detailed GUI
+============================================================
+Shows complete step-by-step calculation including:
+- Edge digital roots
+- Descending and ascending arrangements (D and A)
+- Subtraction and next number
+
+Author: Muhammad Saddam Khokhar
+Preprint: https://www.preprints.org/manuscript/202608.1972
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
+import math
+import re
+
+
+# ============================================================
+# CORE MATHEMATICAL FUNCTIONS
+# ============================================================
+
+def digital_root(x):
+    while x >= 10:
+        x = sum(int(d) for d in str(x))
+    return x
+
+
+def transform_hexagon(digits):
+    """Returns (next_digits, edge_values, D, A)."""
+    # Edge values
+    edge_values = []
+    for i in range(6):
+        di = digits[i]
+        dj = digits[(i + 1) % 6]
+        edge_values.append(digital_root(di + dj))
+
+    # Descending and ascending
+    sorted_desc = sorted(edge_values, reverse=True)
+    sorted_asc = sorted(edge_values)
+    D = int(''.join(str(v) for v in sorted_desc))
+    A = int(''.join(str(v) for v in sorted_asc))
+
+    result = D - A
+    result_str = str(result).zfill(6)
+    next_digits = [int(c) for c in result_str]
+
+    return next_digits, edge_values, D, A
+
+
+def trace_to_fixed_point(start_number):
+    """
+    Returns list of dicts with detailed step info.
+    """
+    steps = []
+    current = str(start_number).zfill(6)
+    digits = [int(c) for c in current]
+    seen = set()
+
+    while current not in seen:
+        seen.add(current)
+        next_digits, edge_vals, D, A = transform_hexagon(digits)
+        next_num = ''.join(str(d) for d in next_digits)
+        step_info = {
+            'number': current,
+            'digits': digits,
+            'edge_values': edge_vals,
+            'D': D,
+            'A': A,
+            'next': next_num,
+            'is_fixed': (next_digits == digits)
+        }
+        steps.append(step_info)
+        if step_info['is_fixed']:
+            break
+        current = next_num
+        digits = next_digits
+
+    return steps, steps[-1]['next'] if steps else current
+
+
+def find_fixed_points():
+    fixed = []
+    for n in range(1000000):
+        digits = [int(c) for c in str(n).zfill(6)]
+        nd, _, _, _ = transform_hexagon(digits)
+        if nd == digits:
+            fixed.append(str(n).zfill(6))
+    return sorted(fixed)
+
+
+# ============================================================
+# HEXAGON DRAWING
+# ============================================================
+def draw_hexagon(ax, digits, edge_vals, title="", highlight=False):
+    ax.clear()
+    ax.set_aspect('equal')
+    ax.axis('off')
+
+    vertex_color = '#dbeafe' if not highlight else '#fde68a'
+    edge_color = '#3b82f6' if not highlight else '#f59e0b'
+
+    angles = np.linspace(np.pi / 2, 2 * np.pi + np.pi / 2, 7)[:6]
+    radius = 1.5
+    vertices = [(radius * math.cos(a), radius * math.sin(a)) for a in angles]
+
+    # Edges
+    for i in range(6):
+        x1, y1 = vertices[i]
+        x2, y2 = vertices[(i + 1) % 6]
+        ax.plot([x1, x2], [y1, y2], color=edge_color, linewidth=2.5)
+
+    # Vertices
+    for i, (x, y) in enumerate(vertices):
+        circle = plt.Circle((x, y), 0.28, color=vertex_color, ec=edge_color, linewidth=2)
+        ax.add_patch(circle)
+        ax.text(x, y, str(digits[i]), ha='center', va='center',
+                fontsize=16, fontweight='bold', color='#1a365d')
+
+    # Edge values
+    for i in range(6):
+        x1, y1 = vertices[i]
+        x2, y2 = vertices[(i + 1) % 6]
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        dx, dy = x2 - x1, y2 - y1
+        length = math.hypot(dx, dy)
+        nx, ny = -dy / length * 0.25, dx / length * 0.25
+        ax.text(mx + nx, my + ny, str(edge_vals[i]), ha='center', va='center',
+                fontsize=14, color='#dc2626', fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='#dc2626'))
+
+    ax.set_xlim(-2.2, 2.2)
+    ax.set_ylim(-2.2, 2.2)
+    if title:
+        ax.text(0, 2.3, title, ha='center', va='center', fontsize=12, fontweight='bold')
+
+
+# ============================================================
+# GUI APPLICATION
+# ============================================================
+class KhokharHexagonGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("KHOKHAR Hexagon Digital Root – Detailed Steps")
+        self.root.geometry("1450x850")
+        self.root.configure(bg='#f0f4f8')
+
+        # State
+        self.steps = []  # list of dict step info
+        self.current_step = 0
+        self.fixed_points = []
+
+        self.setup_ui()
+        self.reset_to_761733()
+        self.find_and_display_fixed_points()
+
+    def setup_ui(self):
+        main = tk.Frame(self.root, bg='#f0f4f8')
+        main.pack(fill='both', expand=True, padx=10, pady=10)
+
+        # ===== LEFT PANEL (Step List + Detail) =====
+        left = tk.Frame(main, bg='#ffffff', relief='groove', bd=2)
+        left.pack(side='left', fill='both', expand=False, padx=(0, 10))
+        left.config(width=450)
+        left.pack_propagate(False)
+
+        tk.Label(left, text="📋 Step-by-Step Process", font=('Arial', 14, 'bold'),
+                 bg='#ffffff', fg='#1a365d').pack(pady=10)
+
+        # Listbox with steps
+        list_frame = tk.Frame(left, bg='#ffffff')
+        list_frame.pack(fill='both', expand=True, padx=10)
+        scroll = tk.Scrollbar(list_frame)
+        scroll.pack(side='right', fill='y')
+        self.step_list = tk.Listbox(list_frame, yscrollcommand=scroll.set,
+                                    font=('Courier', 9), bg='#f7fafc',
+                                    selectmode='single', height=12)
+        self.step_list.pack(side='left', fill='both', expand=True)
+        scroll.config(command=self.step_list.yview)
+        self.step_list.bind('<<ListboxSelect>>', self.on_step_selected)
+
+        # Detail text area (shows D, A, subtraction)
+        tk.Label(left, text="📐 Calculation Details", font=('Arial', 11, 'bold'),
+                 bg='#ffffff', fg='#1a365d').pack(pady=(10, 0))
+        self.detail_text = tk.Text(left, height=8, font=('Courier', 10),
+                                   bg='#f0f4f8', wrap='word', relief='flat')
+        self.detail_text.pack(fill='x', padx=10, pady=5)
+        self.detail_text.config(state='disabled')
+
+        # Info labels
+        info = tk.Frame(left, bg='#ffffff')
+        info.pack(fill='x', padx=10, pady=5)
+        self.step_count_label = tk.Label(info, text="Steps: 0", font=('Arial', 10),
+                                         bg='#ffffff')
+        self.step_count_label.pack(side='left')
+        self.fixed_point_label = tk.Label(info, text="Fixed: --", font=('Arial', 10, 'bold'),
+                                          bg='#ffffff', fg='#2b6cb0')
+        self.fixed_point_label.pack(side='right')
+
+        # Controls
+        ctrl = tk.Frame(left, bg='#ffffff')
+        ctrl.pack(fill='x', padx=10, pady=10)
+        for t, cmd in [("◀ Prev", self.prev_step), ("Next ▶", self.next_step),
+                       ("▶ Animate", self.animate), ("⏹ Stop", self.stop_anim)]:
+            btn = tk.Button(ctrl, text=t, font=('Arial', 10), padx=10, pady=5,
+                            bg='#a0aec0' if t.startswith('◀') or t.startswith(
+                                'Next') else '#48bb78' if 'Animate' in t else '#fc8181',
+                            fg='white', command=cmd)
+            btn.pack(side='left', padx=2)
+
+        # ===== RIGHT PANEL =====
+        right = tk.Frame(main, bg='#f0f4f8')
+        right.pack(side='right', fill='both', expand=True)
+
+        # Top: title + input
+        top = tk.Frame(right, bg='#f0f4f8')
+        top.pack(fill='x', pady=5)
+        tk.Label(top, text="🔢 KHOKHAR Hexagon Digital Root", font=('Arial', 16, 'bold'),
+                 bg='#f0f4f8', fg='#1a365d').pack()
+        tk.Label(top, text="Unique fixed-point: 761733 (The Khokhar Constant)",
+                 font=('Arial', 11, 'italic'), bg='#f0f4f8', fg='#2d3748').pack()
+
+        inp = tk.Frame(top, bg='#f0f4f8')
+        inp.pack(pady=5)
+        tk.Label(inp, text="Enter 6-digit number:", font=('Arial', 11), bg='#f0f4f8').pack(side='left', padx=5)
+        self.entry_var = tk.StringVar(value="761733")
+        self.entry = tk.Entry(inp, textvariable=self.entry_var, font=('Arial', 14), width=10, justify='center')
+        self.entry.pack(side='left', padx=10)
+        self.entry.bind('<Return>', lambda e: self.transform_from_entry())
+        for lbl, cmd in [("▶ Transform", self.transform_from_entry),
+                         ("↺ Reset", self.reset_to_761733),
+                         ("🔍 Fixed Points", self.show_fixed_points)]:
+            btn = tk.Button(inp, text=lbl, font=('Arial', 10, 'bold') if lbl.startswith('▶') else ('Arial', 10),
+                            bg='#48bb78' if lbl.startswith('▶') else '#ed8936' if lbl.startswith('↺') else '#4299e1',
+                            fg='white', padx=15, pady=5, command=cmd)
+            btn.pack(side='left', padx=3)
+
+        # Matplotlib figure
+        self.figure, self.ax = plt.subplots(figsize=(7, 6))
+        self.figure.patch.set_facecolor('#f0f4f8')
+        self.ax.axis('off')
+        self.canvas = FigureCanvasTkAgg(self.figure, right)
+        self.canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=5)
+
+        # Status bar
+        status = tk.Frame(right, bg='#e2e8f0')
+        status.pack(fill='x', pady=5)
+        self.status_label = tk.Label(status, text="Ready", font=('Arial', 10), bg='#e2e8f0', anchor='w')
+        self.status_label.pack(side='left', padx=5, fill='x', expand=True)
+        self.anim_running = False
+
+    def update_step_list(self):
+        self.step_list.delete(0, tk.END)
+        if not self.steps:
+            self.step_list.insert(tk.END, "No steps")
+            return
+        for i, s in enumerate(self.steps):
+            label = f"{i}: {s['number']} → {s['next']}"
+            if s['is_fixed']:
+                label += " ★"
+            self.step_list.insert(tk.END, label)
+        self.step_count_label.config(text=f"Steps: {len(self.steps)}")
+        self.select_step(self.current_step)
+
+    def select_step(self, idx):
+        if 0 <= idx < len(self.steps):
+            self.step_list.selection_clear(0, tk.END)
+            self.step_list.selection_set(idx)
+            self.step_list.see(idx)
+            self.current_step = idx
+            self.show_step_details(idx)
+            self.update_hexagon(idx)
+
+    def on_step_selected(self, event):
+        sel = self.step_list.curselection()
+        if sel:
+            self.select_step(sel[0])
+
+    def show_step_details(self, idx):
+        """Update detail text area with D, A, subtraction."""
+        if idx < 0 or idx >= len(self.steps):
+            return
+        s = self.steps[idx]
+        edge_str = ', '.join(str(v) for v in s['edge_values'])
+        lines = [
+            f"Number: {s['number']}",
+            f"Edge roots: [{edge_str}]",
+            f"Descending (D): {s['D']:06d}",
+            f"Ascending  (A): {s['A']:06d}",
+            f"Subtract: {s['D']:06d} - {s['A']:06d} = {s['next']}",
+        ]
+        if s['is_fixed']:
+            lines.append("★ FIXED POINT REACHED")
+        self.detail_text.config(state='normal')
+        self.detail_text.delete(1.0, tk.END)
+        self.detail_text.insert(1.0, '\n'.join(lines))
+        self.detail_text.config(state='disabled')
+
+    def update_hexagon(self, idx):
+        if idx < 0 or idx >= len(self.steps):
+            return
+        s = self.steps[idx]
+        title = f"Step {idx}: {s['number']} → {s['next']}"
+        if s['is_fixed']:
+            title += " ★ FIXED"
+        draw_hexagon(self.ax, s['digits'], s['edge_values'], title, highlight=s['is_fixed'])
+        self.canvas.draw()
+        self.status_label.config(text=f"Step {idx}: {s['number']} → {s['next']}")
+
+    def next_step(self):
+        if self.steps and self.current_step < len(self.steps) - 1:
+            self.select_step(self.current_step + 1)
+
+    def prev_step(self):
+        if self.steps and self.current_step > 0:
+            self.select_step(self.current_step - 1)
+
+    def transform_from_entry(self):
+        try:
+            val = self.entry_var.get().strip()
+            if len(val) != 6 or not val.isdigit():
+                messagebox.showerror("Error", "Enter 6 digits (000000-999999)")
+                return
+            self.steps, final = trace_to_fixed_point(val)
+            self.current_step = 0
+            self.update_step_list()
+            self.fixed_point_label.config(text=f"Fixed: {final}")
+            self.status_label.config(text=f"Reaches {final} in {len(self.steps)} steps")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def reset_to_761733(self):
+        self.entry_var.set("761733")
+        self.transform_from_entry()
+
+    def find_and_display_fixed_points(self):
+        self.fixed_points = find_fixed_points()
+
+    def show_fixed_points(self):
+        msg = "═══════════════════════════════\n"
+        msg += "  KHOKHAR HEXAGON FIXED POINTS\n"
+        msg += "═══════════════════════════════\n\n"
+        msg += "  • 000000 (Trivial)\n"
+        msg += "  • 761733 (Khokhar Constant)\n\n"
+        msg += f"  Total: {len(self.fixed_points)}\n"
+        messagebox.showinfo("Fixed Points", msg)
+
+    def animate(self):
+        if not self.steps or self.anim_running:
+            return
+        self.anim_running = True
+        self.current_step = 0
+
+        def step():
+            if not self.anim_running:
+                return
+            if self.current_step < len(self.steps) - 1:
+                self.select_step(self.current_step)
+                self.current_step += 1
+                self.root.after(600, step)
+            else:
+                self.select_step(len(self.steps) - 1)
+                self.anim_running = False
+                self.status_label.config(text="Animation complete.")
+
+        self.status_label.config(text="Animating...")
+        self.root.after(500, step)
+
+    def stop_anim(self):
+        self.anim_running = False
+        self.status_label.config(text="Animation stopped.")
+
+
+def main():
+    root = tk.Tk()
+    app = KhokharHexagonGUI(root)
+    root.update_idletasks()
+    w, h = 1450, 850
+    x = (root.winfo_screenwidth() // 2) - (w // 2)
+    y = (root.winfo_screenheight() // 2) - (h // 2)
+    root.geometry(f'{w}x{h}+{x}+{y}')
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
